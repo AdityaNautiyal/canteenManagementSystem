@@ -47,7 +47,7 @@ Canteen::Canteen()
     else {
         cout << "Failed To Connect!" << mysql_errno(conn) << endl;
     }
-    conn = mysql_real_connect(conn, "localhost", "root", "", "cpp_canteen_management", 0, NULL, 0);
+    conn = mysql_real_connect(conn, "localhost", "cpp_canteen_management", 0, NULL, 0);
     if (conn)
     {
 //        cout << "Database Connected To MySql" << conn << endl;
