@@ -1,4 +1,4 @@
-// Developed by CodeWithC.com
+
 #include<iostream>
 #include<cstdio>
 #include<fstream>
