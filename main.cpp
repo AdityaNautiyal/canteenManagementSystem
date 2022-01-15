@@ -1,215 +1,438 @@
+// Developed by CodeWithC.com
 #include<iostream>
-#include<iostream>
+#include<cstdio>
 #include<fstream>
+#include<sstream>
+#include<string>
 #include<cstdlib>
-using std::cout;
-using std::cin;
-using std::endl;
-using std::fstream;
-using std::ofstream;
-using std::ifstream;
-using std::ios;
+#include<conio.h>
+#include<windows.h>
+#include<mysql.h>
+#include <typeinfo>
+using namespace std;
 
+// Global Variable
+int qstate, previousQuantity = 0;
+MYSQL* conn;
+MYSQL_ROW row;
+MYSQL_RES* res;
+// Global Variable End
 
 class Canteen
 {
-private:
-    char id;
-    char item[10];
-    char status[10];
-    float quantity;
 public:
-    void read_data();
-    void show_data();
-    void write_rec();
-    void read_rec();
-    void search_rec();
-    void edit_rec();
-    void delete_rec();
-    bool searchByName();
-    bool checkQuantity();
-    void addNewSale();
+    Canteen();
+    void show();
+    void allItems();
+    void soldItems();
+    void addNewItem();
+    void editItem();
+    void deleteItem();
+    bool searchById(string);
+    bool searchByName(string);
+    bool checkQuantity(string,string);
+    void addNewSale(string,string);
 };
-void Canteen::read_data()
+
+Canteen::Canteen()
 {
-    cout<<"\nEnter id Number: ";
-    cin>>id;
-    cout<<"Enter item Name: ";
-    cin>>item;
-    cout<<"Enter Last status(sale/sold): ";
-    cin>>status;
+    conn = mysql_init(0);
+    if (conn)
+    {
+        cout << "Database Connected" << endl;
+        cout << "Press any key to continue..." << endl;
+        getchar();
+        system("cls");
+    }
+    else {
+        cout << "Failed To Connect!" << mysql_errno(conn) << endl;
+    }
+    conn = mysql_real_connect(conn, "localhost", "root", "", "cpp_canteen_management", 0, NULL, 0);
+    if (conn)
+    {
+//        cout << "Database Connected To MySql" << conn << endl;
+//        cout << "Press any key to continue..." << endl;
+//        getchar();
+        system("cls");
+    }
+    else
+        cout << "Failed To Connect!" << mysql_errno(conn) << endl;
+}
+// Developed by CodeWithC.com
+void Canteen::addNewItem()
+{
+    system("cls");
+
+    string name;
+    string quantity;
+    cout<<"Enter name: ";
+    cin>>name;
     cout<<"Enter quantity: ";
     cin>>quantity;
-    cout<<endl;
-}
-void Canteen::show_data()
-{
-    cout<<"id Number: "<<id<<endl;
-    cout<<"item Name: "<<item<<endl;
-    cout<<"Last status: "<<status<<endl;
-    cout<<"Current quantity:"<<quantity<<endl;
-    cout<<"-------------------------------"<<endl;
-}
-void Canteen::write_rec()
-{
-    ofstream outfile;
-    outfile.open("record.Canteen", ios::binary|ios::app);
-    read_data();
-    outfile.write(reinterpret_cast<char *>(this), sizeof(*this));
-    outfile.close();
-}
-void Canteen::read_rec()
-{
-    ifstream infile;
-    infile.open("record.Canteen", ios::binary);
-    if(!infile)
+
+    string query = "insert into items (name, quantity) values ('"+name+"','"+quantity+"')";
+
+    const char* q = query.c_str();
+
+    qstate = mysql_query(conn, q);
+
+    if (!qstate)
     {
-        cout<<"Error in Opening! File Not Found!!"<<endl;
-        return;
+        cout << endl << "New Item Added." << endl;
     }
-    cout<<"\n****Data from file****"<<endl;
-    while(!infile.eof())
+    else
     {
-        if(infile.read(reinterpret_cast<char*>(this), sizeof(*this)))
+        cout << "Query Execution Problem!" << mysql_errno(conn) << endl;
+    }
+}
+
+void Canteen::addNewSale(string name, string quantity)
+{
+    string query = "insert into sold (name, quantity) values ('"+name+"','"+quantity+"')";
+
+    const char* q = query.c_str();
+
+    qstate = mysql_query(conn, q);
+    int current = 0;
+
+    if (!qstate)
+    {
+        cout << endl << "New Sale Item Added." << endl;
+        stringstream geek1(quantity), ss;
+        geek1 >> current;
+        previousQuantity = previousQuantity - current;
+        ss << previousQuantity;
+        quantity = ss.str();
+        string update_query = "update items set quantity = '"+quantity+"' where name = '"+name+"'";
+        q = update_query.c_str();
+
+        qstate = mysql_query(conn, q);
+        if(qstate)
         {
-            show_data();
+            cout << "Query Execution Problem!" << mysql_errno(conn) << endl;
         }
     }
-    infile.close();
+    else
+    {
+        cout << "Query Execution Problem!" << mysql_errno(conn) << endl;
+    }
 }
-void Canteen::search_rec()
+// Developed by CodeWithC.com
+void Canteen::allItems()
 {
-    int n;
-    ifstream infile;
-    infile.open("record.Canteen", ios::binary);
-    if(!infile)
+    qstate = mysql_query(conn, "select * from items");
+
+    if (!qstate)
     {
-        cout<<"\nError in opening! File Not Found!!"<<endl;
-        return;
+        res = mysql_store_result(conn);
+        printf("\n------------------------------------------------\n");
+        printf("| %-20s | %-10s | %-10s\n", "ID","Item Name", "Quantity");
+        while ((row = mysql_fetch_row(res)))
+        {
+            printf("| %-20s | %-10s | %-10s\n", row[0], row[1], row[2]);
+        }
+        printf("------------------------------------------------\n");
     }
-    infile.seekg(0,ios::end);
-    int count = infile.tellg()/sizeof(*this);
-    cout<<"\n There are "<<count<<" record in the file";
-    cout<<"\n Enter id Number to Search: ";
-    cin>>n;
-    infile.seekg((n-1)*sizeof(*this));
-    infile.read(reinterpret_cast<char*>(this), sizeof(*this));
-    show_data();
+    else
+    {
+        cout << "Query Execution Problem!" << mysql_errno(conn) << endl;
+    }
 }
-void Canteen::edit_rec()
+
+
+void Canteen::soldItems()
 {
-    int n;
-    fstream iofile;
-    iofile.open("record.Canteen", ios::in|ios::binary);
-    if(!iofile)
+    qstate = mysql_query(conn, "select * from sold");
+
+    if (!qstate)
     {
-        cout<<"\nError in opening! File Not Found!!"<<endl;
-        return;
+        res = mysql_store_result(conn);
+        printf("\n------------------------------------------------\n");
+        printf("| %-20s | %-10s | %-10s\n", "ID","Item Name", "Quantity");
+        while ((row = mysql_fetch_row(res)))
+        {
+            printf("| %-20s | %-10s | %-10s\n", row[0], row[1], row[2]);
+        }
+        printf("------------------------------------------------\n");
     }
-    iofile.seekg(0, ios::end);
-    int count = iofile.tellg()/sizeof(*this);
-    cout<<"\n There are "<<count<<" item in the file";
-    cout<<"\n Enter id Number to edit: ";
-    cin>>n;
-    iofile.seekg((n-1)*sizeof(*this));
-    iofile.read(reinterpret_cast<char*>(this), sizeof(*this));
-    cout<<"id "<<n<<" has following data"<<endl;
-    show_data();
-    iofile.close();
-    iofile.open("record.Canteen", ios::out|ios::in|ios::binary);
-    iofile.seekp((n-1)*sizeof(*this));
-    cout<<"\nEnter data to Modify "<<endl;
-    read_data();
-    iofile.write(reinterpret_cast<char*>(this), sizeof(*this));
+    else
+    {
+        cout << "Query Execution Problem!" << mysql_errno(conn) << endl;
+    }
 }
-void Canteen::delete_rec()
+
+
+bool Canteen::searchById(string id)
 {
-    int n;
-    ifstream infile;
-    infile.open("record.Canteen", ios::binary);
-    if(!infile)
+    string query = "SELECT id FROM items";
+    const char* q = query.c_str();
+    qstate = mysql_query(conn, q);
+    res = mysql_store_result(conn);
+
+    bool found = false;
+
+    if(!qstate)
     {
-        cout<<"\nError in opening! File Not Found!!"<<endl;
-        return;
+        while ((row = mysql_fetch_row(res)))
+        {
+            if(row[0] == id)
+            {
+                found = true;
+                break;
+            }
+        }
     }
-    infile.seekg(0,ios::end);
-    int count = infile.tellg()/sizeof(*this);
-    cout<<"\n There are "<<count<<" item in the file";
-    cout<<"\n Enter id Number to Delete: ";
-    cin>>n;
-    fstream tmpfile;
-    tmpfile.open("tmpfile.Canteen", ios::out|ios::binary);
-    infile.seekg(0);
-    for(int i=0; i<count; i++)
-    {
-        infile.read(reinterpret_cast<char*>(this),sizeof(*this));
-        if(i==(n-1))
-            continue;
-        tmpfile.write(reinterpret_cast<char*>(this), sizeof(*this));
-    }
-    infile.close();
-    tmpfile.close();
-    remove("record.Canteen");
-    rename("tmpfile.Canteen", "record.Canteen");
+
+    return found;
 }
+// Developed by CodeWithC.com
+bool Canteen::searchByName(string name)
+{
+    string query = "SELECT name FROM items";
+    const char* q = query.c_str();
+    qstate = mysql_query(conn, q);
+    res = mysql_store_result(conn);
+
+    bool found = false;
+
+    if(!qstate)
+    {
+        while ((row = mysql_fetch_row(res)))
+        {
+            if(row[1] == name)
+            {
+                found = true;
+                break;
+            }
+        }
+    }
+
+    return found;
+}
+
+bool Canteen::checkQuantity(string item, string quantity)
+{
+    string query = "SELECT * FROM items where name = '"+item+"'";
+    const char* q = query.c_str();
+    qstate = mysql_query(conn, q);
+    res = mysql_store_result(conn);
+    int rows, n;
+
+    bool found = false;
+
+    if(!qstate)
+    {
+        while ((row = mysql_fetch_row(res)))
+        {
+            stringstream geek1(row[2]);
+            geek1 >> rows;
+            stringstream geek2(quantity);
+            geek2 >> n;
+
+            if(n <= rows)
+            {
+                found = true;
+                previousQuantity = rows;
+                break;
+            }
+        }
+    }
+
+    return found;
+}
+
+
+void Canteen::editItem()
+{
+    system("cls");
+    Canteen::allItems();
+
+    string id;
+    cout<<"Enter item Id to edit: ";
+    cin>>id;
+
+    bool found = searchById(id);
+
+    if(found)
+    {
+
+        string query = "select * from items where id = '"+id+"'";
+        const char* q = query.c_str();
+        qstate = mysql_query(conn, q);
+
+        if(!qstate)
+        {
+            res = mysql_store_result(conn);
+            row =mysql_fetch_row(res);
+            cout<<"Name "<<row[1]<<" Quantity "<<row[2]<<" with ID "<<row[0];
+        }
+        else
+        {
+            cout << "Query Execution Problem!" << mysql_errno(conn) << endl;
+        }
+
+        string name, quantity;
+        cout<<"\n\nEnter new name: ";
+        cin>>name;
+        cout<<"Enter new quantity: ";
+        cin>>quantity;
+
+        string update_query = "update items set name = '"+name+"', quantity = '"+quantity+"' where id = '"+id+"'";
+
+        q = update_query.c_str();
+        qstate = mysql_query(conn, q);
+
+        if (!qstate)
+        {
+            cout << endl << "Successfully Updated In Database." << endl;
+        }
+        else
+        {
+            cout << "Failed To Update!" << mysql_errno(conn) << endl;
+        }
+    }
+    else
+    {
+        cout << "Please Enter a valid ID." << endl;
+    }
+}
+
+void Canteen::deleteItem()
+{
+    Canteen::allItems();
+
+    string id;
+    cout<<"Enter item Id to delete: ";
+    cin>>id;
+
+    bool found = false;
+
+    string query = "SELECT id FROM items";
+    const char* q = query.c_str();
+    qstate = mysql_query(conn, q);
+    res = mysql_store_result(conn);
+
+    if(!qstate)
+    {
+        while ((row = mysql_fetch_row(res)))
+        {
+            if(row[0] == id)
+            {
+                found = true;
+                break;
+            }
+        }
+    }
+
+    if(found)
+    {
+        query = "delete from items where id = '"+id+"'";
+        q = query.c_str();
+        qstate = mysql_query(conn, q);
+
+        if (!qstate)
+        {
+            cout << "Successfully Deleted From Item Record." << endl;
+        }
+        else
+        {
+            cout << "Failed To Delete!" << mysql_errno(conn) << endl;
+        }
+    }
+    else
+    {
+        cout << "Please Enter a valid ID." << endl;
+    }
+}
+
+
+void Canteen::show()
+{
+    cout << "\nCanteen Management System" << endl;
+
+    cout << "1.New Customer" << endl;
+    cout << "2.All Items" << endl;
+    cout << "3.Sold Items" << endl;
+    cout << "4.Add New Item" << endl;
+    cout << "5.Edit Item" << endl;
+    cout << "6.Delete Item" << endl;
+    cout << "7.Exit" << endl;
+    cout<<"Enter your choice: ";
+}
+// Developed by CodeWithC.com
 int main()
 {
-    Canteen A;
+    system("cls");
+    system("title Canteen Management Program");
+    system("mode con: cols=140 lines=30");
+    system("color 0f");
+    Canteen canteen;
+
     int choice;
-    cout<<"***Canteen Management System***"<<endl;
-    while(true)
+    string name;
+
+again:
+    canteen.show();
+
+    cin>>choice;
+    if(choice == 1)
     {
-        cout<<"Enter Number to use the command ";
-        cout<<"\n [1] Add item";
-        cout<<"\n [2] Show item";
-        cout<<"\n [3] Search item by id";
-        cout<<"\n [4] Edit item";
-        cout<<"\n [5] Delete item";
-        cout<<"\n [6] Sold Items";
-        cout<<"\n [7] Search item by name";
-        cout<<"\n [8] Check Quantity";
-        cout<<"\n [9] Add New Sale";
-        cout<<"\n [10] Quit";
-        cout<<"\nEnter your choice: ";
-        cin>>choice;
-        // show, allItems, soldItems, addNewItem, editItem, deleteItem, searchById, searchByName, checkQuantity, addNewSale2
-        switch(choice)
+        cout<<"Enter you name: ";
+        cin>>name;
+        cout<<endl;
+        canteen.allItems();
+        cout<<endl;
+        mm:
+        cout<<"\nBuy any item. Enter Name of the item: ";
+        string item, quantity;
+        cin>>item;
+        if(canteen.searchByName(item))
         {
-        case 1:
-            A.write_rec();
-            break;
-        case 2:
-            A.read_rec();
-            break;
-        case 3:
-            A.search_rec();
-            break;
-        case 4:
-            A.edit_rec();
-            break;
-        case 5:
-            A.delete_rec();
-            break;
-        case 6:
-            //A.soldItems();
-            break;
-        case 7:
-            //A.searchByName();
-            break;
-        case 8:
-            //A.checkQuantity();
-            break;
-        case 9:
-            //A.addNewSale();
-            break;
-        case 10:
-            exit(0);
-            break;
-        default:
-            cout<<"\nEnter corret choice";
-            exit(0);
+            cout<<"This item is not present";
+            goto mm;
+        }
+        customer:
+        cout<<"\nEnter quantity of the item: ";
+        cin>>quantity;
+        if(canteen.checkQuantity(item, quantity))
+        {
+            canteen.addNewSale(item, quantity);
+            goto again;
+        }
+        else
+        {
+            cout<<quantity<<" item is not present in our canteen. Try again";
+            goto customer;
         }
     }
-    system("pause");
+    else if(choice == 2)
+    {
+        canteen.allItems();
+        goto again;
+    }
+    else if(choice == 3)
+    {
+        canteen.soldItems();
+        goto again;
+    }
+    else if(choice == 4)
+    {
+        canteen.addNewItem();
+        goto again;
+    }
+    else if(choice == 5)
+    {
+        canteen.editItem();
+        goto again;
+    }
+    else if(choice == 6)
+    {
+        canteen.deleteItem();
+        goto again;
+    }
+    else if(choice == 7)
+    {
+        exit(0);
+    }
     return 0;
-} 
+}
